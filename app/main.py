@@ -1,0 +1,233 @@
+from fastapi import FastAPI,Query,Depends,HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer,OAuth2PasswordRequestForm
+from contextlib import asynccontextmanager
+from sqlalchemy.orm import Session
+from sqlalchemy import or_,func
+from pydantic import BaseModel,EmailStr
+from typing import Optional,List
+from datetime import datetime
+import math,json
+from .database import engine,Base,get_db
+from .models import Ad,User,Payment
+from .auth import hash_pw,verify_pw,make_token,read_token
+from .seed import seed
+try:
+    from .storage import upload_photos_list, upload_base64
+    STORAGE_OK=True
+except:
+    STORAGE_OK=False
+try:
+    from .storage import upload_photos_list, upload_base64
+    STORAGE_OK=True
+except:
+    STORAGE_OK=False
+
+@asynccontextmanager
+async def lifespan(app):
+    Base.metadata.create_all(bind=engine)
+    db=next(get_db())
+    if db.query(Ad).count()==0: seed(db)
+    db.close()
+    yield
+
+app=FastAPI(title="IncontriCity API",lifespan=lifespan)
+app.add_middleware(CORSMiddleware,allow_origins=["*"],allow_credentials=True,allow_methods=["*"],allow_headers=["*"])
+oauth2=OAuth2PasswordBearer(tokenUrl="/auth/login",auto_error=False)
+
+def cur_user(token:str=Depends(oauth2),db:Session=Depends(get_db)):
+    if not token: return None
+    p=read_token(token)
+    if not p: return None
+    return db.query(User).filter(User.email==p.get("sub")).first()
+
+# ── Schemas ───────────────────────────────────────────────────
+class AdOut(BaseModel):
+    id:int;name:str;age:int;city:str;country:str;flag:str
+    cat:str;lang:str;desc:str;services:str;target:str
+    location:str;time:str;verified:bool
+    photos:Optional[str]=None; video:Optional[str]=None
+    user_id:Optional[int]=None
+    services_included:Optional[str]=None; services_extra:Optional[str]=None
+    height:Optional[str]=None; weight:Optional[str]=None
+    ethnicity:Optional[str]=None; orientation:Optional[str]=None
+    eyes:Optional[str]=None; hair_color:Optional[str]=None; hair_length:Optional[str]=None
+    smoker:Optional[str]=None; tattoo:Optional[str]=None; piercing:Optional[str]=None
+    nationality:Optional[str]=None; languages_spoken:Optional[str]=None
+    available_for:Optional[str]=None; meeting_with:Optional[str]=None
+    phone:Optional[str]=None; whatsapp:Optional[bool]=None; telegram:Optional[bool]=None
+    agency:Optional[str]=None
+    model_config={"from_attributes":True}
+
+class Page(BaseModel):
+    items:List[AdOut];total:int;page:int;pages:int
+
+class UserOut(BaseModel):
+    id:int;name:str;email:str;is_admin:bool;plan:str
+    avatar:Optional[str]=None
+    model_config={"from_attributes":True}
+
+class Token(BaseModel):
+    access_token:str;token_type:str="bearer";user:UserOut
+
+class UserCreate(BaseModel):
+    name:str;email:EmailStr;password:str
+
+class UserUpdate(BaseModel):
+    name:Optional[str]=None
+    plan:Optional[str]=None
+    avatar:Optional[str]=None   # base64 data URL, already resized client-side
+
+class AdCreate(BaseModel):
+    name:str;age:int;city:str;country:str="IT";flag:str=""
+    cat:str;lang:str="it";desc:str;services:str=""
+    target:str="Tutti";location:str="Online"
+    time:str="Pubblicato di recente";verified:bool=False
+    photos:Optional[str]=None
+    video:Optional[str]=None
+    services_included:Optional[str]=None
+    services_extra:Optional[str]=None
+    height:Optional[str]=None; weight:Optional[str]=None
+    ethnicity:Optional[str]=None; orientation:Optional[str]=None
+    eyes:Optional[str]=None; hair_color:Optional[str]=None; hair_length:Optional[str]=None
+    smoker:Optional[str]=None; tattoo:Optional[str]=None; piercing:Optional[str]=None
+    nationality:Optional[str]=None; languages_spoken:Optional[str]=None
+    available_for:Optional[str]=None; meeting_with:Optional[str]=None
+    phone:Optional[str]=None; whatsapp:Optional[bool]=False; telegram:Optional[bool]=False
+    agency:Optional[str]=None
+
+class PaymentCreate(BaseModel):
+    amount:str;method:str;plan:str;status:str="completed"
+
+class PaymentOut(BaseModel):
+    id:int;user_email:str;amount:str;method:str;plan:str;status:str;date:str
+    model_config={"from_attributes":True}
+
+# ── ADS ───────────────────────────────────────────────────────
+@app.get("/ads",response_model=Page)
+def list_ads(cat:Optional[str]=None,country:Optional[str]=None,lang:Optional[str]=None,
+             q:Optional[str]=None,page:int=Query(1,ge=1),per_page:int=Query(30,ge=1,le=100),
+             user_id:Optional[int]=None,db:Session=Depends(get_db)):
+    qr=db.query(Ad)
+    if cat: qr=qr.filter(Ad.cat==cat)
+    if country: qr=qr.filter(Ad.country==country)
+    if lang: qr=qr.filter(Ad.lang==lang)
+    if q: qr=qr.filter(or_(Ad.name.ilike(f"%{q}%"),Ad.desc.ilike(f"%{q}%"),Ad.city.ilike(f"%{q}%")))
+    if user_id: qr=qr.filter(Ad.user_id==user_id)
+    total=qr.count(); items=qr.offset((page-1)*per_page).limit(per_page).all()
+    return Page(items=items,total=total,page=page,pages=max(1,math.ceil(total/per_page)))
+
+@app.get("/ads/{ad_id}",response_model=AdOut)
+def get_ad(ad_id:int,db:Session=Depends(get_db)):
+    ad=db.query(Ad).filter(Ad.id==ad_id).first()
+    if not ad: raise HTTPException(404)
+    return ad
+
+@app.post("/ads",response_model=AdOut,status_code=201)
+def create_ad(body:AdCreate,user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user: raise HTTPException(401)
+    if db.query(Ad).filter(Ad.user_id==user.id).count()>=1:
+        raise HTTPException(400,"Puoi pubblicare solo 1 annuncio per account.")
+    data=body.model_dump()
+    if STORAGE_OK:
+        if data.get("photos"): data["photos"]=upload_photos_list(data["photos"])
+        if data.get("video") and data["video"].startswith("data:"): data["video"]=upload_base64(data["video"],"videos")
+    ad=Ad(**data,user_id=user.id)
+    db.add(ad); db.commit(); db.refresh(ad)
+    # Remove 1 fake ad from same country
+    fake=db.query(Ad).filter(Ad.user_id==None, Ad.country==data.get("country","IT")).order_by(Ad.id).first()
+    if fake: db.delete(fake); db.commit()
+    return ad
+
+@app.put("/ads/{ad_id}",response_model=AdOut)
+def update_ad(ad_id:int,body:AdCreate,user=Depends(cur_user),db:Session=Depends(get_db)):
+    ad=db.query(Ad).filter(Ad.id==ad_id).first()
+    if not ad: raise HTTPException(404)
+    if not user or(ad.user_id!=user.id and not user.is_admin): raise HTTPException(403)
+    for k,v in body.model_dump().items(): setattr(ad,k,v)
+    db.commit(); db.refresh(ad); return ad
+
+@app.delete("/ads/{ad_id}",status_code=204)
+def delete_ad(ad_id:int,user=Depends(cur_user),db:Session=Depends(get_db)):
+    ad=db.query(Ad).filter(Ad.id==ad_id).first()
+    if not ad: raise HTTPException(404)
+    if not user or(ad.user_id!=user.id and not user.is_admin): raise HTTPException(403)
+    db.delete(ad); db.commit()
+
+# ── AUTH ──────────────────────────────────────────────────────
+@app.post("/auth/register",response_model=UserOut,status_code=201)
+def register(body:UserCreate,db:Session=Depends(get_db)):
+    if db.query(User).filter(User.email==body.email).first():
+        raise HTTPException(400,"Email già registrata")
+    u=User(name=body.name,email=body.email,hashed_password=hash_pw(body.password))
+    db.add(u); db.commit(); db.refresh(u)
+
+    return u
+
+@app.post("/auth/login",response_model=Token)
+def login(form:OAuth2PasswordRequestForm=Depends(),db:Session=Depends(get_db)):
+    u=db.query(User).filter(User.email==form.username).first()
+    if not u or not verify_pw(form.password,u.hashed_password):
+        raise HTTPException(401,"Credenziali errate")
+    return Token(access_token=make_token({"sub":u.email}),user=UserOut.model_validate(u))
+
+@app.get("/auth/me",response_model=UserOut)
+def me(user=Depends(cur_user)):
+    if not user: raise HTTPException(401)
+    return user
+
+@app.put("/auth/me",response_model=UserOut)
+def update_me(body:UserUpdate,user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user: raise HTTPException(401)
+    if body.name: user.name=body.name
+    if body.plan: user.plan=body.plan
+    if body.avatar is not None:
+        if STORAGE_OK and body.avatar and body.avatar.startswith("data:"):
+            user.avatar=upload_base64(body.avatar,"avatars")
+        else:
+            user.avatar=body.avatar
+    db.commit(); db.refresh(user); return user
+
+# ── PAYMENTS ──────────────────────────────────────────────────
+@app.get("/payments/me",response_model=List[PaymentOut])
+def my_payments(user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user: raise HTTPException(401)
+    return db.query(Payment).filter(Payment.user_id==user.id).order_by(Payment.id.desc()).all()
+
+@app.post("/payments",response_model=PaymentOut,status_code=201)
+def create_payment(body:PaymentCreate,user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user: raise HTTPException(401)
+    p=Payment(user_id=user.id,user_email=user.email,**body.model_dump(),
+              date=datetime.now().strftime("%d/%m/%Y %H:%M"))
+    db.add(p); db.commit(); db.refresh(p)
+    user.plan=body.plan.lower(); db.commit()
+    return p
+
+@app.get("/payments",response_model=List[PaymentOut])
+def all_payments(user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user or not user.is_admin: raise HTTPException(403)
+    return db.query(Payment).order_by(Payment.id.desc()).all()
+
+# ── ADMIN ─────────────────────────────────────────────────────
+@app.get("/admin/stats")
+def stats(user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user or not user.is_admin: raise HTTPException(403)
+    pays=db.query(Payment).filter(Payment.status=="completed").all()
+    rev=sum(float(p.amount.replace("€","")) for p in pays)
+    total=db.query(Ad).count()
+    fake=db.query(Ad).filter(Ad.user_id==None).count()
+    return {"total_ads":total,"real_ads":total-fake,"fake_ads":fake,
+            "total_users":db.query(User).count(),
+            "total_payments":len(pays),"total_revenue":f"€{rev:.2f}"}
+
+@app.get("/admin/users",response_model=List[UserOut])
+def admin_users(user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user or not user.is_admin: raise HTTPException(403)
+    return db.query(User).all()
+
+@app.delete("/admin/users/{uid}",status_code=204)
+def delete_user(uid:int,user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user or not user.is_admin: raise HTTPException(403)
+    u=db.query(User).filter(User.id==uid).first()
+    if not u: raise HTTPException(404)
+    db.delete(u); db.commit()
