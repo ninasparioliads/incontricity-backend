@@ -39,6 +39,10 @@ class Ad(Base):
     whatsapp=Column(Boolean,default=False)
     telegram=Column(Boolean,default=False)
     agency=Column(String(100),nullable=True)
+    ad_plan=Column(String(20),default="free")   # free/standard/premium/vip
+    is_active=Column(Boolean,default=True)
+    expires_at=Column(String(30),nullable=True)  # ISO date string
+    paid=Column(Boolean,default=False)
     services_included=Column(Text,nullable=True)
     services_extra=Column(Text,nullable=True)
     photos=Column(Text,nullable=True)   # JSON array of base64 data URLs
@@ -66,6 +70,10 @@ class Payment(Base):
     whatsapp=Column(Boolean,default=False)
     telegram=Column(Boolean,default=False)
     agency=Column(String(100),nullable=True)
+    ad_plan=Column(String(20),default="free")   # free/standard/premium/vip
+    is_active=Column(Boolean,default=True)
+    expires_at=Column(String(30),nullable=True)  # ISO date string
+    paid=Column(Boolean,default=False)
     services_included=Column(Text,nullable=True)
     services_extra=Column(Text,nullable=True)
     user_email=Column(String(200)); amount=Column(String(20))

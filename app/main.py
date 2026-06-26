@@ -32,7 +32,7 @@ async def lifespan(app):
     yield
 
 app=FastAPI(title="IncontriCity API",lifespan=lifespan)
-app.add_middleware(CORSMiddleware,allow_origins=["*"],allow_credentials=True,allow_methods=["*"],allow_headers=["*"])
+app.add_middleware(CORSMiddleware,allow_origins=["*"],allow_credentials=True,allow_methods=["*"],allow_headers=["*","ngrok-skip-browser-warning"])
 oauth2=OAuth2PasswordBearer(tokenUrl="/auth/login",auto_error=False)
 
 def cur_user(token:str=Depends(oauth2),db:Session=Depends(get_db)):
@@ -207,6 +207,38 @@ def create_payment(body:PaymentCreate,user=Depends(cur_user),db:Session=Depends(
 def all_payments(user=Depends(cur_user),db:Session=Depends(get_db)):
     if not user or not user.is_admin: raise HTTPException(403)
     return db.query(Payment).order_by(Payment.id.desc()).all()
+
+# ── PAYMENTS PLANS ──
+@app.get("/ads/pending_payment")
+def pending_payment(user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user: raise HTTPException(401)
+    ads=db.query(Ad).filter(Ad.user_id==user.id,Ad.paid==False).all()
+    return [{"id":a.id,"name":a.name,"city":a.city,"cat":a.cat,"ad_plan":a.ad_plan,"created":a.time} for a in ads]
+
+@app.post("/ads/{ad_id}/activate")
+def activate_ad(ad_id:int,plan:str="free",user=Depends(cur_user),db:Session=Depends(get_db)):
+    ad=db.query(Ad).filter(Ad.id==ad_id).first()
+    if not ad: raise HTTPException(404)
+    if not user or(ad.user_id!=user.id and not user.is_admin): raise HTTPException(403)
+    from datetime import datetime,timedelta
+    ad.paid=True
+    ad.is_active=True
+    ad.ad_plan=plan
+    if plan=="free":
+        ad.expires_at=(datetime.now()+timedelta(days=30)).strftime("%Y-%m-%d")
+    else:
+        ad.expires_at=(datetime.now()+timedelta(days=30)).strftime("%Y-%m-%d")
+    db.commit()
+    return {"status":"activated","plan":plan,"expires_at":ad.expires_at}
+
+@app.get("/payments/plans")
+def get_plans():
+    return [
+        {"id":"free","name":"Free","price":0,"currency":"EUR","duration_days":30,"description":"1 ad · Standard grid · Expires in 30 days"},
+        {"id":"standard","name":"Standard","price":10,"currency":"EUR","duration_days":30,"description":"Standard grid · 30 days visibility"},
+        {"id":"premium","name":"Premium","price":40,"currency":"EUR","duration_days":30,"description":"Premium section · 30 days · Priority placement"},
+        {"id":"vip","name":"VIP","price":100,"currency":"EUR","duration_days":30,"description":"Featured top · Gold border · Maximum visibility"},
+    ]
 
 # ── ADMIN ─────────────────────────────────────────────────────
 @app.get("/admin/stats")
