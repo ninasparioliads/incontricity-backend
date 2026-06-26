@@ -1,12 +1,9 @@
 import os, uuid, base64, mimetypes, json
-from supabase import create_client
+import httpx
 
 SUPA_URL = os.getenv("SUPABASE_URL", "https://drehyeczjmwspnvodwol.supabase.co")
 SUPA_KEY = os.getenv("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRyZWh5ZWN6am13c3Budm9kd29sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzNjc4MzEsImV4cCI6MjA5Nzk0MzgzMX0.2QiSf2e_7mS6WFG-Jg-cScXdlREMGGr9RBVSjp5uEgM")
 BUCKET = "media"
-
-def get_client():
-    return create_client(SUPA_URL, SUPA_KEY)
 
 def upload_base64(data_url: str, folder: str = "photos") -> str:
     if not data_url or not data_url.startswith("data:"):
@@ -18,14 +15,19 @@ def upload_base64(data_url: str, folder: str = "photos") -> str:
         ext = ext.replace(".jpe", ".jpg")
         file_bytes = base64.b64decode(b64)
         filename = f"{folder}/{uuid.uuid4()}{ext}"
-        client = get_client()
-        client.storage.from_(BUCKET).upload(
-            filename, file_bytes,
-            file_options={"content-type": mime, "cache-control": "3600", "upsert": "false"}
-        )
-        return client.storage.from_(BUCKET).get_public_url(filename)
+        url = f"{SUPA_URL}/storage/v1/object/{BUCKET}/{filename}"
+        headers = {
+            "Authorization": f"Bearer {SUPA_KEY}",
+            "Content-Type": mime,
+            "cache-control": "3600",
+            "x-upsert": "false"
+        }
+        r = httpx.put(url, content=file_bytes, headers=headers)
+        if r.status_code in (200, 201):
+            return f"{SUPA_URL}/storage/v1/object/public/{BUCKET}/{filename}"
+        return data_url
     except Exception as e:
-        print(f"Storage upload error: {e}")
+        print(f"Storage error: {e}")
         return data_url
 
 def upload_photos_list(photos_json: str) -> str:
