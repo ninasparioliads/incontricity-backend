@@ -273,6 +273,25 @@ def occupy_slot(slot_id:int,ad_id:int,user=Depends(cur_user),db:Session=Depends(
     db.commit()
     return{"ok":True}
 
+
+@app.get("/duration-prices")
+def get_duration_prices():
+    return {"prices":{
+        "standard":[10,50,80,200,400,800],
+        "premium":[40,200,320,800,1600,3200],
+        "vip":[100,500,800,2000,4000,8000]
+    }}
+
+@app.put("/duration-prices/{plan_type}")
+def update_duration_prices(plan_type:str,prices:list,user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user or not user.is_admin: raise HTTPException(403)
+    from sqlalchemy import text as sqlt
+    for i,price in enumerate(prices):
+        days=[3,7,30,90,180,365][i]
+        db.execute(sqlt(f"INSERT INTO duration_prices (plan_type,days,label,price) VALUES ('{plan_type}',{days},'{days}d',{price}) ON CONFLICT (plan_type,days) DO UPDATE SET price={price}"))
+    db.commit()
+    return{"ok":True}
+
 # ── ADMIN ─────────────────────────────────────────────────────
 @app.get("/admin/stats")
 def stats(user=Depends(cur_user),db:Session=Depends(get_db)):
