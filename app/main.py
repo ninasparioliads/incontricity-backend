@@ -126,8 +126,6 @@ def get_ad(ad_id:int,db:Session=Depends(get_db)):
 @app.post("/ads",response_model=AdOut,status_code=201)
 def create_ad(body:AdCreate,user=Depends(cur_user),db:Session=Depends(get_db)):
     if not user: raise HTTPException(401)
-    if db.query(Ad).filter(Ad.user_id==user.id).count()>=1:
-        raise HTTPException(400,"Puoi pubblicare solo 1 annuncio per account.")
     data=body.model_dump()
     if STORAGE_OK:
         if data.get("photos"): data["photos"]=upload_photos_list(data["photos"])
