@@ -314,6 +314,31 @@ def set_dur_config(data:dict,user=Depends(cur_user),db:Session=Depends(get_db)):
     db.commit()
     return{"ok":True}
 
+
+@app.post("/ads/{ad_id}/view")
+def track_view(ad_id:int,request:Request,db:Session=Depends(get_db)):
+    from sqlalchemy import text as sqlt
+    import hashlib
+    ip=request.client.host
+    today=str(__import__("datetime").date.today())
+    key=hashlib.md5(f"{ad_id}:{ip}:{today}".encode()).hexdigest()
+    existing=db.execute(sqlt(f"SELECT 1 FROM ad_views WHERE view_key=\'{key}\'")).fetchone()
+    if not existing:
+        db.execute(sqlt("CREATE TABLE IF NOT EXISTS ad_views (id SERIAL PRIMARY KEY, ad_id INTEGER, view_key VARCHAR(50) UNIQUE, created_at TIMESTAMP DEFAULT NOW())"))
+        db.execute(sqlt(f"INSERT INTO ad_views (ad_id,view_key) VALUES ({ad_id},\'{key}\') ON CONFLICT DO NOTHING"))
+        db.commit()
+    count=db.execute(sqlt(f"SELECT COUNT(*) FROM ad_views WHERE ad_id={ad_id}")).fetchone()[0]
+    return{{"count":count,"new":not existing}}
+
+@app.get("/ads/{ad_id}/views")
+def get_views(ad_id:int,db:Session=Depends(get_db)):
+    from sqlalchemy import text as sqlt
+    try:
+        count=db.execute(sqlt(f"SELECT COUNT(*) FROM ad_views WHERE ad_id={ad_id}")).fetchone()[0]
+        return{{"count":count}}
+    except:
+        return{{"count":0}}
+
 # ── ADMIN ─────────────────────────────────────────────────────
 @app.get("/admin/stats")
 def stats(user=Depends(cur_user),db:Session=Depends(get_db)):
