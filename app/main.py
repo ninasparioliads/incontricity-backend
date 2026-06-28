@@ -339,6 +339,19 @@ def get_views(ad_id:int,db:Session=Depends(get_db)):
     except:
         return{{"count":0}}
 
+
+@app.get("/admin/pending")
+def admin_pending(user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user or not user.is_admin: raise HTTPException(403)
+    ads=db.query(Ad).filter(Ad.paid==False,Ad.user_id!=None).all()
+    result=[]
+    for ad in ads:
+        u=db.query(User).filter(User.id==ad.user_id).first()
+        d=ad.__dict__.copy();d.pop("_sa_instance_state",None)
+        d["user_email"]=u.email if u else None
+        result.append(d)
+    return result
+
 # ── ADMIN ─────────────────────────────────────────────────────
 @app.get("/admin/stats")
 def stats(user=Depends(cur_user),db:Session=Depends(get_db)):
