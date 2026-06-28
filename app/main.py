@@ -292,6 +292,28 @@ def update_duration_prices(plan_type:str,prices:list,user=Depends(cur_user),db:S
     db.commit()
     return{"ok":True}
 
+
+@app.get("/duration-prices/config")
+def get_dur_config(db:Session=Depends(get_db)):
+    from sqlalchemy import text as sqlt
+    rows=db.execute(sqlt("SELECT key,value FROM config WHERE key IN ('vip_pct','prem_pct','standard_prices')")).fetchall()
+    result={"vip_pct":[5,15,30,100,270,510,960],"prem_pct":[4,12,25,100,260,490,920],"standard":[5,10,50,80,200,400,800]}
+    for r in rows:
+        import json
+        result[r[0]]=json.loads(r[1])
+    return result
+
+@app.put("/duration-prices/config")
+def set_dur_config(data:dict,user=Depends(cur_user),db:Session=Depends(get_db)):
+    from sqlalchemy import text as sqlt
+    import json
+    if not user or not user.is_admin: raise HTTPException(403)
+    db.execute(sqlt("CREATE TABLE IF NOT EXISTS config (key VARCHAR(50) PRIMARY KEY, value TEXT)"))
+    for k,v in data.items():
+        db.execute(sqlt(f"INSERT INTO config (key,value) VALUES ('{k}','{json.dumps(v)}') ON CONFLICT (key) DO UPDATE SET value='{json.dumps(v)}'"))
+    db.commit()
+    return{"ok":True}
+
 # ── ADMIN ─────────────────────────────────────────────────────
 @app.get("/admin/stats")
 def stats(user=Depends(cur_user),db:Session=Depends(get_db)):
