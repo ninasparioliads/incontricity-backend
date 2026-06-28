@@ -340,6 +340,8 @@ def get_views(ad_id:int,db:Session=Depends(get_db)):
         return{{"count":0}}
 
 
+# ── ADMIN ─────────────────────────────────────────────────────
+
 @app.get("/admin/pending")
 def admin_pending(user=Depends(cur_user),db:Session=Depends(get_db)):
     if not user or not user.is_admin: raise HTTPException(403)
@@ -352,7 +354,6 @@ def admin_pending(user=Depends(cur_user),db:Session=Depends(get_db)):
         result.append(d)
     return result
 
-# ── ADMIN ─────────────────────────────────────────────────────
 @app.get("/admin/stats")
 def stats(user=Depends(cur_user),db:Session=Depends(get_db)):
     if not user or not user.is_admin: raise HTTPException(403)
