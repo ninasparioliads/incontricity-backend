@@ -240,11 +240,45 @@ def get_plans():
         {"id":"vip","name":"VIP","price":100,"currency":"EUR","duration_days":30,"description":"Featured top · Gold border · Maximum visibility"},
     ]
 
+
+@app.get("/grid-types")
+def get_grid_types():
+    return {"types":[
+        {"id":1,"name":"vip","label":"⭐ VIP","rows":3,"cols":5,"slides":2,"color":"#d4af37","icon":"⭐","default_price":100.0},
+        {"id":2,"name":"premium","label":"💎 Premium","rows":5,"cols":5,"slides":3,"color":"#818cf8","icon":"💎","default_price":40.0}
+    ]}
+
+@app.get("/grid-slots")
+def get_grid_slots(slot_type:Optional[str]=None,db:Session=Depends(get_db)):
+    from sqlalchemy import text as sqlt
+    q="SELECT id,slot_type,slide_index,row_index,col_index,price,is_occupied,ad_id FROM grid_slots"
+    if slot_type: q+=f" WHERE slot_type='{slot_type}'"
+    q+=" ORDER BY slide_index,row_index,col_index"
+    rows=db.execute(sqlt(q)).fetchall()
+    return{"slots":[{"id":r[0],"type":r[1],"slide":r[2],"row":r[3],"col":r[4],"price":float(r[5]),"is_occupied":r[6],"ad_id":r[7]} for r in rows]}
+
+@app.put("/grid-slots/{slot_id}/price")
+def update_slot_price(slot_id:int,price:float,user=Depends(cur_user),db:Session=Depends(get_db)):
+    from sqlalchemy import text as sqlt
+    if not user or not user.is_admin: raise HTTPException(403)
+    db.execute(sqlt(f"UPDATE grid_slots SET price={price} WHERE id={slot_id}"))
+    db.commit()
+    return{"ok":True}
+
+@app.put("/grid-slots/{slot_id}/occupy")
+def occupy_slot(slot_id:int,ad_id:int,user=Depends(cur_user),db:Session=Depends(get_db)):
+    from sqlalchemy import text as sqlt
+    if not user: raise HTTPException(401)
+    db.execute(sqlt(f"UPDATE grid_slots SET is_occupied=TRUE,ad_id={ad_id} WHERE id={slot_id}"))
+    db.commit()
+    return{"ok":True}
+
 # ── ADMIN ─────────────────────────────────────────────────────
 @app.get("/admin/stats")
 def stats(user=Depends(cur_user),db:Session=Depends(get_db)):
     if not user or not user.is_admin: raise HTTPException(403)
-    pays=db.query(Payment).filter(Payment.status=="completed").all()
+    from sqlalchemy import text as sqlt3
+    pays=db.execute(sqlt3("SELECT * FROM payments WHERE status='completed'")).fetchall()
     rev=sum(float(p.amount.replace("€","")) for p in pays)
     total=db.query(Ad).count()
     fake=db.query(Ad).filter(Ad.user_id==None).count()
