@@ -221,7 +221,7 @@ def activate_ad(ad_id:int,plan:str="free",user=Depends(cur_user),db:Session=Depe
     if not ad: raise HTTPException(404)
     if not user or(ad.user_id!=user.id and not user.is_admin): raise HTTPException(403)
     from datetime import datetime,timedelta
-    ad.paid=True
+    ad.paid=False
     ad.is_active=True
     ad.ad_plan=plan
     if plan=="free":
