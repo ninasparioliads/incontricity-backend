@@ -108,7 +108,7 @@ class PaymentOut(BaseModel):
 def list_ads(cat:Optional[str]=None,country:Optional[str]=None,lang:Optional[str]=None,
              q:Optional[str]=None,page:int=Query(1,ge=1),per_page:int=Query(30,ge=1,le=100),
              user_id:Optional[int]=None,db:Session=Depends(get_db)):
-    qr=db.query(Ad)
+    qr=db.query(Ad).filter((Ad.paid==True)|(Ad.user_id==None))
     if cat: qr=qr.filter(Ad.cat==cat)
     if country: qr=qr.filter(Ad.country==country)
     if lang: qr=qr.filter(Ad.lang==lang)
