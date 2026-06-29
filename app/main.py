@@ -95,6 +95,10 @@ class AdCreate(BaseModel):
     available_for:Optional[str]=None; meeting_with:Optional[str]=None
     phone:Optional[str]=None; whatsapp:Optional[bool]=False; telegram:Optional[bool]=False
     agency:Optional[str]=None
+    rates:Optional[str]=None
+    contact_email:Optional[str]=None
+    ad_plan:Optional[str]=None
+    slot_id:Optional[int]=None
 
 class PaymentCreate(BaseModel):
     amount:str;method:str;plan:str;status:str="completed"
