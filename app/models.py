@@ -39,6 +39,8 @@ class Ad(Base):
     whatsapp=Column(Boolean,default=False)
     telegram=Column(Boolean,default=False)
     agency=Column(String(100),nullable=True)
+    rates=Column(Text,nullable=True)
+    contact_email=Column(String(200),nullable=True)
     ad_plan=Column(String(20),default="free")   # free/standard/premium/vip
     is_active=Column(Boolean,default=True)
     expires_at=Column(String(30),nullable=True)  # ISO date string
