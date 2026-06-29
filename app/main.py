@@ -59,6 +59,7 @@ class AdOut(BaseModel):
     agency:Optional[str]=None
     rates:Optional[str]=None
     contact_email:Optional[str]=None
+    telegram_user:Optional[str]=None
     ad_plan:Optional[str]=None
     paid:Optional[bool]=None
     model_config={"from_attributes":True}
@@ -101,6 +102,7 @@ class AdCreate(BaseModel):
     agency:Optional[str]=None
     rates:Optional[str]=None
     contact_email:Optional[str]=None
+    telegram_user:Optional[str]=None
     ad_plan:Optional[str]=None
     slot_id:Optional[int]=None
 
