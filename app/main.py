@@ -57,6 +57,10 @@ class AdOut(BaseModel):
     available_for:Optional[str]=None; meeting_with:Optional[str]=None
     phone:Optional[str]=None; whatsapp:Optional[bool]=None; telegram:Optional[bool]=None
     agency:Optional[str]=None
+    rates:Optional[str]=None
+    contact_email:Optional[str]=None
+    ad_plan:Optional[str]=None
+    paid:Optional[bool]=None
     model_config={"from_attributes":True}
 
 class Page(BaseModel):
