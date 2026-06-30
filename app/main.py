@@ -497,6 +497,15 @@ def reject_verification(vid:int,user=Depends(cur_user),db:Session=Depends(get_db
     db.commit()
     return{"ok":True}
 
+
+@app.delete("/admin/verifications/{vid}")
+def delete_verification(vid:int,user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user or not user.is_admin: raise HTTPException(403)
+    from sqlalchemy import text as sqlt
+    db.execute(sqlt(f"DELETE FROM verification_requests WHERE id={vid}"))
+    db.commit()
+    return{"ok":True}
+
 # ── ADMIN ─────────────────────────────────────────────────────
 
 @app.get("/admin/pending")
