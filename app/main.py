@@ -574,6 +574,24 @@ def admin_full_stats(user=Depends(cur_user),db:Session=Depends(get_db)):
         "active_ads":active_ads,
     }
 
+
+@app.get("/admin/users-revenue")
+def admin_users_revenue(user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user or not user.is_admin: raise HTTPException(403)
+    from sqlalchemy import text as sqlt
+    rows=db.execute(sqlt("""
+        SELECT u.id,u.name,u.email,u.plan,
+               COUNT(DISTINCT a.id) as ads_count,
+               COALESCE(SUM(CAST(REPLACE(REPLACE(p.amount,'€',''),',','.') AS FLOAT)),0) as total_spent,
+               COUNT(DISTINCT p.id) as payments_count
+        FROM users u
+        LEFT JOIN ads a ON a.user_id=u.id
+        LEFT JOIN payments p ON p.user_id=u.id AND p.status='completed'
+        GROUP BY u.id,u.name,u.email,u.plan
+        ORDER BY total_spent DESC
+    """)).fetchall()
+    return[{"id":r[0],"name":r[1],"email":r[2],"plan":r[3],"ads_count":r[4],"total_spent":float(r[5]),"payments_count":r[6]} for r in rows]
+
 # ── ADMIN ─────────────────────────────────────────────────────
 
 @app.get("/admin/pending")
