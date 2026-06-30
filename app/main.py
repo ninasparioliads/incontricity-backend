@@ -462,6 +462,41 @@ def admin_all_ads(page:int=Query(1,ge=1),per_page:int=Query(25,ge=1,le=100),
     pages=(total+per_page-1)//per_page
     return{"items":items,"total":total,"page":page,"pages":pages}
 
+
+@app.get("/admin/verifications")
+def admin_verifications(user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user or not user.is_admin: raise HTTPException(403)
+    from sqlalchemy import text as sqlt
+    db.execute(sqlt("CREATE TABLE IF NOT EXISTS verification_requests (id SERIAL PRIMARY KEY, ad_id INTEGER, id_document TEXT, selfie_document TEXT, created_at TIMESTAMP DEFAULT NOW(), status VARCHAR(20) DEFAULT 'pending')"))
+    rows=db.execute(sqlt("""
+        SELECT v.id,v.ad_id,v.id_document,v.selfie_document,v.created_at,v.status,a.name,a.city,a.flag
+        FROM verification_requests v
+        LEFT JOIN ads a ON a.id=v.ad_id
+        ORDER BY v.created_at DESC
+    """)).fetchall()
+    return[{"id":r[0],"ad_id":r[1],"id_document":r[2],"selfie_document":r[3],
+            "created_at":str(r[4]),"status":r[5],"ad_name":r[6],"ad_city":r[7],"ad_flag":r[8]} for r in rows]
+
+@app.put("/admin/verifications/{vid}/approve")
+def approve_verification(vid:int,user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user or not user.is_admin: raise HTTPException(403)
+    from sqlalchemy import text as sqlt
+    row=db.execute(sqlt(f"SELECT ad_id FROM verification_requests WHERE id={vid}")).fetchone()
+    if not row: raise HTTPException(404)
+    ad=db.query(Ad).filter(Ad.id==row[0]).first()
+    if ad: ad.verified=True
+    db.execute(sqlt(f"UPDATE verification_requests SET status='approved' WHERE id={vid}"))
+    db.commit()
+    return{"ok":True}
+
+@app.put("/admin/verifications/{vid}/reject")
+def reject_verification(vid:int,user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user or not user.is_admin: raise HTTPException(403)
+    from sqlalchemy import text as sqlt
+    db.execute(sqlt(f"UPDATE verification_requests SET status='rejected' WHERE id={vid}"))
+    db.commit()
+    return{"ok":True}
+
 # ── ADMIN ─────────────────────────────────────────────────────
 
 @app.get("/admin/pending")
