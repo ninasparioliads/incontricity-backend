@@ -639,8 +639,8 @@ def admin_ad_detail(aid:int,user=Depends(cur_user),db:Session=Depends(get_db)):
         payments=db.execute(sqlt(f"SELECT amount,method,plan,status,date FROM payments WHERE user_email='{owner.email}' ORDER BY date DESC")).fetchall()
     return{
         "ad":{"id":ad.id,"name":ad.name,"age":ad.age,"city":ad.city,"country":ad.country,"cat":ad.cat,
-              "ad_plan":ad.ad_plan,"paid":ad.paid,"verified":ad.verified,"views":ad.views or 0,
-              "is_active":ad.is_active,"time":ad.time,"user_id":ad.user_id},
+              "ad_plan":ad.ad_plan,"paid":ad.paid,"verified":ad.verified,
+              "is_active":ad.is_active,"time":ad.time,"user_id":ad.user_id,"views":getattr(ad,"views",0) or 0},
         "owner":{"name":owner.name,"email":owner.email,"plan":owner.plan} if owner else None,
         "verifications":[{"id":v[0],"status":v[1],"created_at":str(v[2])} for v in verifs],
         "payments":[{"amount":p[0],"method":p[1],"plan":p[2],"status":p[3],"date":str(p[4])} for p in payments],
