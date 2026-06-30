@@ -1,4 +1,4 @@
-from fastapi import FastAPI,Query,Depends,HTTPException,Request,Request
+from fastapi import FastAPI,Query,Depends,HTTPException,Request,BackgroundTasks,Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer,OAuth2PasswordRequestForm
 from contextlib import asynccontextmanager
@@ -407,23 +407,40 @@ def check_favorite(ad_id:int,user=Depends(cur_user),db:Session=Depends(get_db)):
 
 
 @app.post("/ads/{ad_id}/request-verification")
-def request_verification(ad_id:int,user=Depends(cur_user),db:Session=Depends(get_db)):
+def request_verification(ad_id:int,body:dict,background_tasks:BackgroundTasks,user=Depends(cur_user),db:Session=Depends(get_db)):
     if not user: raise HTTPException(401)
     ad=db.query(Ad).filter(Ad.id==ad_id).first()
     if not ad: raise HTTPException(404)
     if ad.user_id!=user.id: raise HTTPException(403)
-    try:
-        subject=f"IncontriCity - Verification request for ad #{ad_id}"
-        body=f"""
-        <h2>Verification Request</h2>
-        <p><b>Ad:</b> {ad.name}, {ad.age} - {ad.city}</p>
-        <p><b>User:</b> {user.email}</p>
-        <p><b>Ad ID:</b> {ad_id}</p>
-        <p>The user has requested photo verification.</p>
-        """
-        send_email(GMAIL_USER,subject,body)
-    except Exception as e:
-        print("Verification email failed:",e)
+
+    def _send():
+        try:
+            subject=f"IncontriCity - Verification request for ad #{ad_id}"
+            id_doc=body.get("id_document","")
+            selfie=body.get("selfie_document","")
+            email_body=f"""
+            <h2>Verification Request</h2>
+            <p><b>Ad:</b> {ad.name}, {ad.age} - {ad.city}</p>
+            <p><b>User:</b> {user.email}</p>
+            <p><b>Ad ID:</b> {ad_id}</p>
+            <p>ID document attached as base64 image data ({len(id_doc)} chars).</p>
+            <p>Selfie attached as base64 image data ({len(selfie)} chars).</p>
+            <p>Documents stored - check admin panel or database for full images.</p>
+            """
+            send_email(GMAIL_USER,subject,email_body)
+        except Exception as e:
+            print("Verification email failed:",e)
+
+    background_tasks.add_task(_send)
+
+    # Save documents to DB for admin review
+    from sqlalchemy import text as sqlt
+    import json as _json
+    db.execute(sqlt("CREATE TABLE IF NOT EXISTS verification_requests (id SERIAL PRIMARY KEY, ad_id INTEGER, id_document TEXT, selfie_document TEXT, created_at TIMESTAMP DEFAULT NOW())"))
+    db.execute(sqlt(f"INSERT INTO verification_requests (ad_id,id_document,selfie_document) VALUES ({ad_id},:idd,:slf)"),
+               {"idd":body.get("id_document",""),"slf":body.get("selfie_document","")})
+    db.commit()
+
     return{"ok":True}
 
 @app.put("/ads/{ad_id}/verify")
