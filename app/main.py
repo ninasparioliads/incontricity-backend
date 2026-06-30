@@ -452,6 +452,16 @@ def set_verified(ad_id:int,verified:bool=True,user=Depends(cur_user),db:Session=
     db.commit()
     return{"ok":True,"verified":verified}
 
+
+@app.get("/admin/all-ads")
+def admin_all_ads(page:int=Query(1,ge=1),per_page:int=Query(25,ge=1,le=100),
+                   user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user or not user.is_admin: raise HTTPException(403)
+    total=db.query(Ad).count()
+    items=db.query(Ad).order_by(Ad.id.desc()).offset((page-1)*per_page).limit(per_page).all()
+    pages=(total+per_page-1)//per_page
+    return{"items":items,"total":total,"page":page,"pages":pages}
+
 # ── ADMIN ─────────────────────────────────────────────────────
 
 @app.get("/admin/pending")
