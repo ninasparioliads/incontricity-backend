@@ -348,6 +348,40 @@ def get_views(ad_id:int,db:Session=Depends(get_db)):
         return{{"count":0}}
 
 
+
+@app.get("/favorites")
+def get_favorites(user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user: raise HTTPException(401)
+    from sqlalchemy import text as sqlt
+    rows=db.execute(sqlt(f"SELECT ad_id FROM favorites WHERE user_id={user.id}")).fetchall()
+    ad_ids=[r[0] for r in rows]
+    if not ad_ids: return []
+    ads=db.query(Ad).filter(Ad.id.in_(ad_ids)).all()
+    return ads
+
+@app.post("/favorites/{ad_id}")
+def add_favorite(ad_id:int,user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user: raise HTTPException(401)
+    from sqlalchemy import text as sqlt
+    db.execute(sqlt(f"INSERT INTO favorites (user_id,ad_id) VALUES ({user.id},{ad_id}) ON CONFLICT DO NOTHING"))
+    db.commit()
+    return{"ok":True}
+
+@app.delete("/favorites/{ad_id}")
+def remove_favorite(ad_id:int,user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user: raise HTTPException(401)
+    from sqlalchemy import text as sqlt
+    db.execute(sqlt(f"DELETE FROM favorites WHERE user_id={user.id} AND ad_id={ad_id}"))
+    db.commit()
+    return{"ok":True}
+
+@app.get("/favorites/check/{ad_id}")
+def check_favorite(ad_id:int,user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user: return{"saved":False}
+    from sqlalchemy import text as sqlt
+    r=db.execute(sqlt(f"SELECT 1 FROM favorites WHERE user_id={user.id} AND ad_id={ad_id}")).fetchone()
+    return{"saved":bool(r)}
+
 # ── ADMIN ─────────────────────────────────────────────────────
 
 @app.get("/admin/pending")
