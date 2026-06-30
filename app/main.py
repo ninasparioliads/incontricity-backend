@@ -412,15 +412,18 @@ def request_verification(ad_id:int,user=Depends(cur_user),db:Session=Depends(get
     ad=db.query(Ad).filter(Ad.id==ad_id).first()
     if not ad: raise HTTPException(404)
     if ad.user_id!=user.id: raise HTTPException(403)
-    subject=f"IncontriCity - Verification request for ad #{ad_id}"
-    body=f"""
-    <h2>Verification Request</h2>
-    <p><b>Ad:</b> {ad.name}, {ad.age} - {ad.city}</p>
-    <p><b>User:</b> {user.email}</p>
-    <p><b>Ad ID:</b> {ad_id}</p>
-    <p>The user has requested photo verification. Ask them to send ID documents and verification photos, then mark the ad as verified in Admin panel.</p>
-    """
-    send_email(GMAIL_USER,subject,body)
+    try:
+        subject=f"IncontriCity - Verification request for ad #{ad_id}"
+        body=f"""
+        <h2>Verification Request</h2>
+        <p><b>Ad:</b> {ad.name}, {ad.age} - {ad.city}</p>
+        <p><b>User:</b> {user.email}</p>
+        <p><b>Ad ID:</b> {ad_id}</p>
+        <p>The user has requested photo verification.</p>
+        """
+        send_email(GMAIL_USER,subject,body)
+    except Exception as e:
+        print("Verification email failed:",e)
     return{"ok":True}
 
 @app.put("/ads/{ad_id}/verify")
