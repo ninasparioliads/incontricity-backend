@@ -586,7 +586,7 @@ def admin_users_revenue(user=Depends(cur_user),db:Session=Depends(get_db)):
                COUNT(DISTINCT p.id) as payments_count
         FROM users u
         LEFT JOIN ads a ON a.user_id=u.id
-        LEFT JOIN payments p ON p.user_id=u.id AND p.status='completed'
+        LEFT JOIN payments p ON p.user_email=u.email AND p.status='completed'
         GROUP BY u.id,u.name,u.email,u.plan
         ORDER BY total_spent DESC
     """)).fetchall()
