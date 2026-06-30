@@ -530,6 +530,50 @@ def my_verifications(user=Depends(cur_user),db:Session=Depends(get_db)):
     rows=db.execute(sqlt(f"SELECT ad_id,status FROM verification_requests WHERE ad_id IN ({ids_str})")).fetchall()
     return[{"ad_id":r[0],"status":r[1]} for r in rows]
 
+
+@app.get("/admin/full-stats")
+def admin_full_stats(user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user or not user.is_admin: raise HTTPException(403)
+    from sqlalchemy import text as sqlt
+
+    # Top countries
+    top_countries=db.execute(sqlt("SELECT country,COUNT(*) c FROM ads WHERE user_id IS NOT NULL GROUP BY country ORDER BY c DESC LIMIT 8")).fetchall()
+
+    # Category distribution
+    cat_dist=db.execute(sqlt("SELECT cat,COUNT(*) c FROM ads WHERE user_id IS NOT NULL GROUP BY cat ORDER BY c DESC")).fetchall()
+
+    # Recent registered users
+    recent_users=db.execute(sqlt("SELECT id,name,email,plan FROM users ORDER BY id DESC LIMIT 8")).fetchall()
+
+    # Recent real ads
+    recent_ads=db.execute(sqlt("SELECT id,name,city,ad_plan,paid FROM ads WHERE user_id IS NOT NULL ORDER BY id DESC LIMIT 8")).fetchall()
+
+    # Pending verifications count
+    pending_verif=0
+    try:
+        pending_verif=db.execute(sqlt("SELECT COUNT(*) FROM verification_requests WHERE status='pending'")).fetchone()[0]
+    except: pass
+
+    # Pending payments (unpaid real ads)
+    pending_payments=db.query(Ad).filter(Ad.paid==False,Ad.user_id!=None).count()
+
+    # Revenue by plan
+    revenue_by_plan=db.execute(sqlt("SELECT plan,SUM(CAST(REPLACE(REPLACE(amount,'€',''),',','.') AS FLOAT)) tot FROM payments WHERE status='completed' GROUP BY plan")).fetchall()
+
+    # Active vs expired (free ads older than 30 days could be expired - simplified)
+    active_ads=db.query(Ad).filter(Ad.paid==True).count()
+
+    return {
+        "top_countries":[{"country":r[0],"count":r[1]} for r in top_countries],
+        "cat_dist":[{"cat":r[0],"count":r[1]} for r in cat_dist],
+        "recent_users":[{"id":r[0],"name":r[1],"email":r[2],"plan":r[3]} for r in recent_users],
+        "recent_ads":[{"id":r[0],"name":r[1],"city":r[2],"plan":r[3],"paid":r[4]} for r in recent_ads],
+        "pending_verifications":pending_verif,
+        "pending_payments":pending_payments,
+        "revenue_by_plan":[{"plan":r[0],"total":float(r[1] or 0)} for r in revenue_by_plan],
+        "active_ads":active_ads,
+    }
+
 # ── ADMIN ─────────────────────────────────────────────────────
 
 @app.get("/admin/pending")
