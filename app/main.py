@@ -519,6 +519,17 @@ def revoke_verification(vid:int,user=Depends(cur_user),db:Session=Depends(get_db
     db.commit()
     return{"ok":True}
 
+
+@app.get("/my-verifications")
+def my_verifications(user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user: raise HTTPException(401)
+    from sqlalchemy import text as sqlt
+    ad_ids=[a.id for a in db.query(Ad).filter(Ad.user_id==user.id).all()]
+    if not ad_ids: return[]
+    ids_str=",".join(str(i) for i in ad_ids)
+    rows=db.execute(sqlt(f"SELECT ad_id,status FROM verification_requests WHERE ad_id IN ({ids_str})")).fetchall()
+    return[{"ad_id":r[0],"status":r[1]} for r in rows]
+
 # ── ADMIN ─────────────────────────────────────────────────────
 
 @app.get("/admin/pending")
