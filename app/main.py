@@ -506,6 +506,19 @@ def delete_verification(vid:int,user=Depends(cur_user),db:Session=Depends(get_db
     db.commit()
     return{"ok":True}
 
+
+@app.put("/admin/verifications/{vid}/revoke")
+def revoke_verification(vid:int,user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user or not user.is_admin: raise HTTPException(403)
+    from sqlalchemy import text as sqlt
+    row=db.execute(sqlt(f"SELECT ad_id FROM verification_requests WHERE id={vid}")).fetchone()
+    if not row: raise HTTPException(404)
+    ad=db.query(Ad).filter(Ad.id==row[0]).first()
+    if ad: ad.verified=False
+    db.execute(sqlt(f"UPDATE verification_requests SET status='rejected' WHERE id={vid}"))
+    db.commit()
+    return{"ok":True}
+
 # ── ADMIN ─────────────────────────────────────────────────────
 
 @app.get("/admin/pending")
