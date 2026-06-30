@@ -595,6 +595,57 @@ def admin_users_revenue(user=Depends(cur_user),db:Session=Depends(get_db)):
     """)).fetchall()
     return[{"id":r[0],"name":r[1],"email":r[2],"plan":r[3],"ads_count":r[4],"total_spent":float(r[5]),"payments_count":r[6]} for r in rows]
 
+
+@app.get("/admin/users/{uid}/detail")
+def admin_user_detail(uid:int,user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user or not user.is_admin: raise HTTPException(403)
+    from sqlalchemy import text as sqlt
+    target=db.query(User).filter(User.id==uid).first()
+    if not target: raise HTTPException(404)
+    ads=db.query(Ad).filter(Ad.user_id==uid).all()
+    payments=db.execute(sqlt(f"SELECT amount,method,plan,status,date FROM payments WHERE user_email='{target.email}' ORDER BY date DESC")).fetchall()
+    verifs=[]
+    try:
+        ad_ids=[a.id for a in ads]
+        if ad_ids:
+            ids_str=",".join(str(i) for i in ad_ids)
+            verifs=db.execute(sqlt(f"SELECT ad_id,status,created_at FROM verification_requests WHERE ad_id IN ({ids_str}) ORDER BY created_at DESC")).fetchall()
+    except: pass
+    total_spent=sum(float(str(p[0]).replace("€","").replace(",",".")) for p in payments if p[3]=="completed")
+    return{
+        "user":{"id":target.id,"name":target.name,"email":target.email,"plan":target.plan,"is_admin":target.is_admin},
+        "ads":[{"id":a.id,"name":a.name,"city":a.city,"ad_plan":a.ad_plan,"paid":a.paid,"verified":a.verified,"views":a.views or 0} for a in ads],
+        "payments":[{"amount":p[0],"method":p[1],"plan":p[2],"status":p[3],"date":str(p[4])} for p in payments],
+        "verifications":[{"ad_id":v[0],"status":v[1],"created_at":str(v[2])} for v in verifs],
+        "total_spent":total_spent,
+        "total_ads":len(ads),
+    }
+
+@app.get("/admin/ads/{aid}/detail")
+def admin_ad_detail(aid:int,user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user or not user.is_admin: raise HTTPException(403)
+    from sqlalchemy import text as sqlt
+    ad=db.query(Ad).filter(Ad.id==aid).first()
+    if not ad: raise HTTPException(404)
+    owner=None
+    if ad.user_id:
+        owner=db.query(User).filter(User.id==ad.user_id).first()
+    verifs=[]
+    try:
+        verifs=db.execute(sqlt(f"SELECT id,status,created_at FROM verification_requests WHERE ad_id={aid} ORDER BY created_at DESC")).fetchall()
+    except: pass
+    payments=[]
+    if owner:
+        payments=db.execute(sqlt(f"SELECT amount,method,plan,status,date FROM payments WHERE user_email='{owner.email}' ORDER BY date DESC")).fetchall()
+    return{
+        "ad":{"id":ad.id,"name":ad.name,"age":ad.age,"city":ad.city,"country":ad.country,"cat":ad.cat,
+              "ad_plan":ad.ad_plan,"paid":ad.paid,"verified":ad.verified,"views":ad.views or 0,
+              "is_active":ad.is_active,"time":ad.time,"user_id":ad.user_id},
+        "owner":{"name":owner.name,"email":owner.email,"plan":owner.plan} if owner else None,
+        "verifications":[{"id":v[0],"status":v[1],"created_at":str(v[2])} for v in verifs],
+        "payments":[{"amount":p[0],"method":p[1],"plan":p[2],"status":p[3],"date":str(p[4])} for p in payments],
+    }
+
 # ── ADMIN ─────────────────────────────────────────────────────
 
 @app.get("/admin/pending")
