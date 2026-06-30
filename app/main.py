@@ -382,6 +382,33 @@ def check_favorite(ad_id:int,user=Depends(cur_user),db:Session=Depends(get_db)):
     r=db.execute(sqlt(f"SELECT 1 FROM favorites WHERE user_id={user.id} AND ad_id={ad_id}")).fetchone()
     return{"saved":bool(r)}
 
+
+@app.post("/ads/{ad_id}/request-verification")
+def request_verification(ad_id:int,user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user: raise HTTPException(401)
+    ad=db.query(Ad).filter(Ad.id==ad_id).first()
+    if not ad: raise HTTPException(404)
+    if ad.user_id!=user.id: raise HTTPException(403)
+    subject=f"IncontriCity - Verification request for ad #{ad_id}"
+    body=f"""
+    <h2>Verification Request</h2>
+    <p><b>Ad:</b> {ad.name}, {ad.age} - {ad.city}</p>
+    <p><b>User:</b> {user.email}</p>
+    <p><b>Ad ID:</b> {ad_id}</p>
+    <p>The user has requested photo verification. Ask them to send ID documents and verification photos, then mark the ad as verified in Admin panel.</p>
+    """
+    send_email(GMAIL_USER,subject,body)
+    return{"ok":True}
+
+@app.put("/ads/{ad_id}/verify")
+def set_verified(ad_id:int,verified:bool=True,user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user or not user.is_admin: raise HTTPException(403)
+    ad=db.query(Ad).filter(Ad.id==ad_id).first()
+    if not ad: raise HTTPException(404)
+    ad.verified=verified
+    db.commit()
+    return{"ok":True,"verified":verified}
+
 # ── ADMIN ─────────────────────────────────────────────────────
 
 @app.get("/admin/pending")
