@@ -113,6 +113,29 @@ class PaymentOut(BaseModel):
     id:int;user_email:str;amount:str;method:str;plan:str;status:str;date:str
     model_config={"from_attributes":True}
 
+
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+GMAIL_USER="ninasparioliads@gmail.com"
+GMAIL_PASS="nxms ivxh mszh nqjx"
+
+def send_email(to_addr,subject,body):
+    try:
+        msg=MIMEMultipart()
+        msg["From"]=GMAIL_USER
+        msg["To"]=to_addr
+        msg["Subject"]=subject
+        msg.attach(MIMEText(body,"html"))
+        with smtplib.SMTP_SSL("smtp.gmail.com",465) as s:
+            s.login(GMAIL_USER,GMAIL_PASS)
+            s.sendmail(GMAIL_USER,to_addr,msg.as_string())
+        return True
+    except Exception as e:
+        print("Email error:",e)
+        return False
+
 # ── ADS ───────────────────────────────────────────────────────
 @app.get("/ads",response_model=Page)
 def list_ads(cat:Optional[str]=None,country:Optional[str]=None,lang:Optional[str]=None,
