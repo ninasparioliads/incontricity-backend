@@ -139,12 +139,15 @@ def send_email(to_addr,subject,body):
 # ── ADS ───────────────────────────────────────────────────────
 @app.get("/ads",response_model=Page)
 def list_ads(cat:Optional[str]=None,country:Optional[str]=None,lang:Optional[str]=None,
+             city:Optional[str]=None,plan:Optional[str]=None,
              q:Optional[str]=None,page:int=Query(1,ge=1),per_page:int=Query(30,ge=1,le=100),
              user_id:Optional[int]=None,db:Session=Depends(get_db)):
     qr=db.query(Ad).filter((Ad.paid==True)|(Ad.user_id==None))
     if cat: qr=qr.filter(Ad.cat==cat)
     if country: qr=qr.filter(Ad.country==country)
+    if city: qr=qr.filter(Ad.city.ilike(f"%{city}%"))
     if lang: qr=qr.filter(Ad.lang==lang)
+    if plan: qr=qr.filter(Ad.ad_plan==plan)
     if q: qr=qr.filter(or_(Ad.name.ilike(f"%{q}%"),Ad.desc.ilike(f"%{q}%"),Ad.city.ilike(f"%{q}%")))
     if user_id: qr=qr.filter(Ad.user_id==user_id)
     total=qr.count(); items=qr.offset((page-1)*per_page).limit(per_page).all()
