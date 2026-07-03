@@ -651,6 +651,21 @@ def admin_ad_detail(aid:int,user=Depends(cur_user),db:Session=Depends(get_db)):
         "payments":[{"amount":p[0],"method":p[1],"plan":p[2],"status":p[3],"date":str(p[4])} for p in payments],
     }
 
+
+@app.get("/site-config")
+def get_site_config(db:Session=Depends(get_db)):
+    from sqlalchemy import text as sqlt
+    rows=db.execute(sqlt("SELECT key,value FROM site_config")).fetchall()
+    return{r[0]:r[1] for r in rows}
+
+@app.put("/site-config/{key}")
+def set_site_config(key:str,body:dict,user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user or not user.is_admin: raise HTTPException(403)
+    from sqlalchemy import text as sqlt
+    db.execute(sqlt("INSERT INTO site_config (key,value,updated_at) VALUES (:k,:v,NOW()) ON CONFLICT (key) DO UPDATE SET value=:v,updated_at=NOW()"),{"k":key,"v":body.get("value","")})
+    db.commit()
+    return{"ok":True}
+
 # ── ADMIN ─────────────────────────────────────────────────────
 
 @app.get("/admin/pending")
