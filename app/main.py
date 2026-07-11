@@ -168,6 +168,8 @@ def create_ad(body:AdCreate,user=Depends(cur_user),db:Session=Depends(get_db)):
     if STORAGE_OK:
         if data.get("photos"): data["photos"]=upload_photos_list(data["photos"])
         if data.get("video") and data["video"].startswith("data:"): data["video"]=upload_base64(data["video"],"videos")
+    data.pop("slot_id",None)
+    data.pop("phone_prefix",None)
     ad=Ad(**data,user_id=user.id)
     db.add(ad); db.commit(); db.refresh(ad)
     # Remove 1 fake ad from same country
@@ -180,7 +182,10 @@ def update_ad(ad_id:int,body:AdCreate,user=Depends(cur_user),db:Session=Depends(
     ad=db.query(Ad).filter(Ad.id==ad_id).first()
     if not ad: raise HTTPException(404)
     if not user or(ad.user_id!=user.id and not user.is_admin): raise HTTPException(403)
-    for k,v in body.model_dump().items(): setattr(ad,k,v)
+    update_data=body.model_dump()
+    update_data.pop("slot_id",None)
+    update_data.pop("phone_prefix",None)
+    for k,v in update_data.items(): setattr(ad,k,v)
     db.commit(); db.refresh(ad); return ad
 
 @app.delete("/ads/{ad_id}",status_code=204)
