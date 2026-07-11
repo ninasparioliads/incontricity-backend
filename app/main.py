@@ -142,14 +142,18 @@ def list_ads(cat:Optional[str]=None,country:Optional[str]=None,lang:Optional[str
              city:Optional[str]=None,plan:Optional[str]=None,
              q:Optional[str]=None,page:int=Query(1,ge=1),per_page:int=Query(30,ge=1,le=100),
              user_id:Optional[int]=None,db:Session=Depends(get_db)):
-    qr=db.query(Ad).filter((Ad.paid==True)|(Ad.user_id==None))
+    if user_id:
+        # For own ads: show all (paid and unpaid)
+        qr=db.query(Ad).filter(Ad.user_id==user_id)
+    else:
+        # Public listing: only paid or fake
+        qr=db.query(Ad).filter((Ad.paid==True)|(Ad.user_id==None))
     if cat: qr=qr.filter(Ad.cat==cat)
     if country: qr=qr.filter(Ad.country==country)
     if city: qr=qr.filter(Ad.city.ilike(f"%{city}%"))
     if lang: qr=qr.filter(Ad.lang==lang)
     if plan: qr=qr.filter(Ad.ad_plan==plan)
     if q: qr=qr.filter(or_(Ad.name.ilike(f"%{q}%"),Ad.desc.ilike(f"%{q}%"),Ad.city.ilike(f"%{q}%")))
-    if user_id: qr=qr.filter(Ad.user_id==user_id)
     total=qr.count()
     # Real ads first, then fake; within each group by id desc
     items=qr.order_by(Ad.user_id.asc().nullslast(),Ad.id.desc()).offset((page-1)*per_page).limit(per_page).all()
