@@ -50,6 +50,8 @@ class Ad(Base):
     services_extra=Column(Text,nullable=True)
     photos=Column(Text,nullable=True)   # JSON array of base64 data URLs
     video=Column(Text,nullable=True)    # base64 data URL
+    instagram_user=Column(String(100),nullable=True)
+    views=Column(Integer,default=0)
 
 class Payment(Base):
     __tablename__="payments"

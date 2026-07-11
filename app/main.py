@@ -25,7 +25,7 @@ except:
 
 @asynccontextmanager
 async def lifespan(app):
-    Base.metadata.create_all(bind=engine)
+    # Base.metadata.create_all(bind=engine)  # disabled to preserve manual schema changes
     db=next(get_db())
     if db.query(Ad).count()==0: seed(db)
     db.close()
