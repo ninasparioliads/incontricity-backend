@@ -294,12 +294,25 @@ def get_grid_types():
     ]}
 
 @app.get("/grid-slots")
-def get_grid_slots(slot_type:Optional[str]=None,db:Session=Depends(get_db)):
+def get_grid_slots(slot_type:Optional[str]=None,country:Optional[str]=None,city:Optional[str]=None,db:Session=Depends(get_db)):
     from sqlalchemy import text as sqlt
-    q="SELECT id,slot_type,slide_index,row_index,col_index,price,is_occupied,ad_id FROM grid_slots"
-    if slot_type: q+=f" WHERE slot_type='{slot_type}'"
-    q+=" ORDER BY slide_index,row_index,col_index"
-    rows=db.execute(sqlt(q)).fetchall()
+    st=slot_type or "vip"
+    if country and city:
+        count=db.execute(sqlt(f"SELECT COUNT(*) FROM grid_slots WHERE slot_type=:st AND country=:c AND city=:ci"),{"st":st,"c":country,"ci":city}).fetchone()[0]
+        if count==0:
+            max_slots=30 if st=="vip" else 50
+            cols=5; rows_per_slide=3 if st=="vip" else 5
+            default_price=200 if st=="vip" else 100
+            slide=0; row=0; col=0
+            for i in range(max_slots):
+                db.execute(sqlt("INSERT INTO grid_slots (slot_type,row_index,col_index,slide_index,price,is_occupied,country,city) VALUES (:st,:r,:c,:sl,:p,false,:co,:ci)"),{"st":st,"r":row,"c":col,"sl":slide,"p":default_price,"co":country,"ci":city})
+                col+=1
+                if col>=cols: col=0; row+=1
+                if row>=rows_per_slide: row=0; slide+=1
+            db.commit()
+        rows=db.execute(sqlt("SELECT id,slot_type,slide_index,row_index,col_index,price,is_occupied,ad_id FROM grid_slots WHERE slot_type=:st AND country=:c AND city=:ci ORDER BY slide_index,row_index,col_index"),{"st":st,"c":country,"ci":city}).fetchall()
+    else:
+        rows=db.execute(sqlt(f"SELECT id,slot_type,slide_index,row_index,col_index,price,is_occupied,ad_id FROM grid_slots WHERE slot_type='{st}' AND (country IS NULL OR country='') ORDER BY slide_index,row_index,col_index")).fetchall()
     return{"slots":[{"id":r[0],"type":r[1],"slide":r[2],"row":r[3],"col":r[4],"price":float(r[5]),"is_occupied":r[6],"ad_id":r[7]} for r in rows]}
 
 @app.put("/grid-slots/{slot_id}/price")
