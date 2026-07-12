@@ -194,9 +194,11 @@ def update_ad(ad_id:int,body:AdCreate,user=Depends(cur_user),db:Session=Depends(
 
 @app.delete("/ads/{ad_id}",status_code=204)
 def delete_ad(ad_id:int,user=Depends(cur_user),db:Session=Depends(get_db)):
+    from sqlalchemy import text as sqlt
     ad=db.query(Ad).filter(Ad.id==ad_id).first()
     if not ad: raise HTTPException(404)
     if not user or(ad.user_id!=user.id and not user.is_admin): raise HTTPException(403)
+    db.execute(sqlt(f"UPDATE grid_slots SET is_occupied=false,ad_id=NULL WHERE ad_id={ad_id}"))
     db.delete(ad); db.commit()
 
 # ── AUTH ──────────────────────────────────────────────────────
