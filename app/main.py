@@ -693,6 +693,26 @@ def set_site_config(key:str,body:dict,user=Depends(cur_user),db:Session=Depends(
     db.commit()
     return{"ok":True}
 
+
+@app.get("/grid-slots/{slot_id}/bookings")
+def get_slot_bookings(slot_id:int,db:Session=Depends(get_db)):
+    from sqlalchemy import text as sqlt
+    rows=db.execute(sqlt("SELECT start_date,end_date FROM grid_slots WHERE id=:id AND is_occupied=true AND start_date IS NOT NULL"),{"id":slot_id}).fetchall()
+    # Also get future bookings from payments or other slots with same position
+    return[{"start_date":str(r[0]),"end_date":str(r[1])} for r in rows if r[0] and r[1]]
+
+@app.post("/grid-slots/{slot_id}/book")
+def book_slot(slot_id:int,body:dict,user=Depends(cur_user),db:Session=Depends(get_db)):
+    from sqlalchemy import text as sqlt
+    if not user: raise HTTPException(401)
+    start=body.get("startDate")
+    end=body.get("endDate")
+    ad_id=body.get("ad_id")
+    db.execute(sqlt("UPDATE grid_slots SET is_occupied=true,ad_id=:a,start_date=:s,end_date=:e WHERE id=:id"),
+               {"a":ad_id,"s":start,"e":end,"id":slot_id})
+    db.commit()
+    return{"ok":True}
+
 # ── ADMIN ─────────────────────────────────────────────────────
 
 @app.get("/admin/pending")
