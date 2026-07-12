@@ -84,8 +84,9 @@ class UserUpdate(BaseModel):
     avatar:Optional[str]=None   # base64 data URL, already resized client-side
 
 class AdCreate(BaseModel):
+    model_config={"extra":"ignore"}
     name:str;age:int;city:str;country:str="IT";flag:str=""
-    cat:str;lang:str="it";desc:str;services:str=""
+    cat:str="donna-uomo";lang:str="it";desc:str="";services:str=""
     target:str="Tutti";location:str="Online"
     time:str="Pubblicato di recente";verified:bool=False
     photos:Optional[str]=None
@@ -103,7 +104,9 @@ class AdCreate(BaseModel):
     rates:Optional[str]=None
     contact_email:Optional[str]=None
     telegram_user:Optional[str]=None
+    instagram_user:Optional[str]=None
     ad_plan:Optional[str]=None
+    paid:Optional[bool]=False
     slot_id:Optional[int]=None
 
 class PaymentCreate(BaseModel):
