@@ -366,11 +366,13 @@ def update_duration_prices(plan_type:str,prices:list,user=Depends(cur_user),db:S
 @app.get("/duration-prices/config")
 def get_dur_config(db:Session=Depends(get_db)):
     from sqlalchemy import text as sqlt
-    rows=db.execute(sqlt("SELECT key,value FROM config WHERE key IN ('vip_pct','prem_pct','standard_prices')")).fetchall()
+    rows=db.execute(sqlt("SELECT key,value FROM config WHERE key IN ('vip_pct','prem_pct','standard')")).fetchall()
     result={"vip_pct":[5,15,30,100,270,510,960],"prem_pct":[4,12,25,100,260,490,920],"standard":[5,10,50,80,200,400,800]}
     for r in rows:
         import json
-        result[r[0]]=json.loads(r[1])
+        k=r[0]
+        result[k]=json.loads(r[1])
+        if k=="standard":result["standard_prices"]=result["standard"]
     return result
 
 @app.put("/duration-prices/config")
