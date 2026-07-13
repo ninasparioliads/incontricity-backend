@@ -307,10 +307,13 @@ def get_grid_slots(slot_type:Optional[str]=None,country:Optional[str]=None,city:
         if count==0:
             max_slots=30 if st=="vip" else 50
             cols=5; rows_per_slide=3 if st=="vip" else 5
+            # Get prices from template slots (global slots without country)
+            template=db.execute(sqlt("SELECT row_index,col_index,slide_index,price FROM grid_slots WHERE slot_type=:st AND (country IS NULL OR country='') ORDER BY slide_index,row_index,col_index"),{"st":st}).fetchall()
             default_price=200 if st=="vip" else 100
             slide=0; row=0; col=0
             for i in range(max_slots):
-                db.execute(sqlt("INSERT INTO grid_slots (slot_type,row_index,col_index,slide_index,price,is_occupied,country,city) VALUES (:st,:r,:c,:sl,:p,false,:co,:ci)"),{"st":st,"r":row,"c":col,"sl":slide,"p":default_price,"co":country,"ci":city})
+                price=template[i][3] if i<len(template) else default_price
+                db.execute(sqlt("INSERT INTO grid_slots (slot_type,row_index,col_index,slide_index,price,is_occupied,country,city) VALUES (:st,:r,:c,:sl,:p,false,:co,:ci)"),{"st":st,"r":row,"c":col,"sl":slide,"p":price,"co":country,"ci":city})
                 col+=1
                 if col>=cols: col=0; row+=1
                 if row>=rows_per_slide: row=0; slide+=1
