@@ -327,7 +327,11 @@ def get_grid_slots(slot_type:Optional[str]=None,country:Optional[str]=None,city:
 def update_slot_price(slot_id:int,price:float,user=Depends(cur_user),db:Session=Depends(get_db)):
     from sqlalchemy import text as sqlt
     if not user or not user.is_admin: raise HTTPException(403)
-    db.execute(sqlt(f"UPDATE grid_slots SET price={price} WHERE id={slot_id}"))
+    # Get slot position
+    slot=db.execute(sqlt(f"SELECT slot_type,slide_index,row_index,col_index FROM grid_slots WHERE id={slot_id}")).fetchone()
+    if slot:
+        # Update all slots with same position across all cities
+        db.execute(sqlt(f"UPDATE grid_slots SET price={price} WHERE slot_type='{slot[0]}' AND slide_index={slot[1]} AND row_index={slot[2]} AND col_index={slot[3]}"))
     db.commit()
     return{"ok":True}
 
