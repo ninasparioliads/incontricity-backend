@@ -48,6 +48,7 @@ class AdOut(BaseModel):
     location:str;time:str;verified:bool
     photos:Optional[str]=None; video:Optional[str]=None
     user_id:Optional[int]=None
+    views:Optional[int]=0
     services_included:Optional[str]=None; services_extra:Optional[str]=None
     height:Optional[str]=None; weight:Optional[str]=None
     ethnicity:Optional[str]=None; orientation:Optional[str]=None
@@ -144,7 +145,8 @@ def send_email(to_addr,subject,body):
 def list_ads(cat:Optional[str]=None,country:Optional[str]=None,lang:Optional[str]=None,
              city:Optional[str]=None,plan:Optional[str]=None,
              q:Optional[str]=None,page:int=Query(1,ge=1),per_page:int=Query(30,ge=1,le=100),
-             user_id:Optional[int]=None,db:Session=Depends(get_db)):
+             user_id:Optional[int]=None
+    views:Optional[int]=0,db:Session=Depends(get_db)):
     if user_id:
         # For own ads: show all (paid and unpaid)
         qr=db.query(Ad).filter(Ad.user_id==user_id)
