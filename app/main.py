@@ -158,8 +158,13 @@ def list_ads(cat:Optional[str]=None,country:Optional[str]=None,lang:Optional[str
     if plan: qr=qr.filter(Ad.ad_plan==plan)
     if q: qr=qr.filter(or_(Ad.name.ilike(f"%{q}%"),Ad.desc.ilike(f"%{q}%"),Ad.city.ilike(f"%{q}%")))
     total=qr.count()
-    # Real ads first, then fake; within each group by id desc
-    items=qr.order_by(Ad.user_id.asc().nullslast(),Ad.id.desc()).offset((page-1)*per_page).limit(per_page).all()
+    # Real ads first, then fake; standard ordered by views desc, others by id desc
+    from sqlalchemy import case
+    items=qr.order_by(
+        Ad.user_id.asc().nullslast(),
+        case((Ad.ad_plan=="standard", Ad.views), else_=999999).desc(),
+        Ad.id.desc()
+    ).offset((page-1)*per_page).limit(per_page).all()
     return Page(items=items,total=total,page=page,pages=max(1,math.ceil(total/per_page)))
 
 @app.get("/ads/{ad_id}",response_model=AdOut)
