@@ -376,7 +376,7 @@ def get_dur_config(db:Session=Depends(get_db)):
     return result
 
 @app.put("/duration-prices/config")
-def set_dur_config(data:dict,user=Depends(cur_user),db:Session=Depends(get_db)):
+def set_dur_config(data:dict=Body(...),user=Depends(cur_user),db:Session=Depends(get_db)):
     from sqlalchemy import text as sqlt
     import json
     if not user or not user.is_admin: raise HTTPException(403)
