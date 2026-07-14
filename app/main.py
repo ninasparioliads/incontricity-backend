@@ -730,6 +730,22 @@ def book_slot(slot_id:int,body:dict,user=Depends(cur_user),db:Session=Depends(ge
     db.commit()
     return{"ok":True}
 
+
+@app.post("/admin/fake-views")
+def fake_views(user=Depends(cur_user),db:Session=Depends(get_db)):
+    from sqlalchemy import text as sqlt
+    import datetime
+    if not user or not user.is_admin: raise HTTPException(403)
+    # Get ads from users registered at least 3 days ago
+    cutoff=(datetime.datetime.now()-datetime.timedelta(days=3)).isoformat()
+    ads=db.execute(sqlt(f"SELECT a.id FROM ads a JOIN users u ON a.user_id=u.id WHERE u.created_at IS NULL OR u.id IN (SELECT id FROM users WHERE created_at<'{cutoff}') AND a.paid=true")).fetchall()
+    updated=0
+    for (ad_id,) in ads:
+        db.execute(sqlt(f"UPDATE ads SET views=COALESCE(views,0)+1 WHERE id={ad_id}"))
+        updated+=1
+    db.commit()
+    return{"updated":updated}
+
 # ── ADMIN ─────────────────────────────────────────────────────
 
 @app.get("/admin/pending")
