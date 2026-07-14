@@ -404,6 +404,7 @@ def track_view(ad_id:int,request:Request,db:Session=Depends(get_db)):
     if not existing:
         db.execute(sqlt("CREATE TABLE IF NOT EXISTS ad_views (id SERIAL PRIMARY KEY, ad_id INTEGER, view_key VARCHAR(50) UNIQUE, created_at TIMESTAMP DEFAULT NOW())"))
         db.execute(sqlt(f"INSERT INTO ad_views (ad_id,view_key) VALUES ({ad_id},\'{key}\') ON CONFLICT DO NOTHING"))
+        db.execute(sqlt(f"UPDATE ads SET views=COALESCE(views,0)+1 WHERE id={ad_id}"))
         db.commit()
     count=db.execute(sqlt(f"SELECT COUNT(*) FROM ad_views WHERE ad_id={ad_id}")).fetchone()[0]
     return{{"count":count,"new":not existing}}
