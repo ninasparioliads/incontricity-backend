@@ -407,16 +407,16 @@ def track_view(ad_id:int,request:Request,db:Session=Depends(get_db)):
         db.execute(sqlt(f"UPDATE ads SET views=COALESCE(views,0)+1 WHERE id={ad_id}"))
         db.commit()
     count=db.execute(sqlt(f"SELECT COUNT(*) FROM ad_views WHERE ad_id={ad_id}")).fetchone()[0]
-    return{{"count":count,"new":not existing}}
+    return{"count":count,"new":not existing}
 
 @app.get("/ads/{ad_id}/views")
 def get_views(ad_id:int,db:Session=Depends(get_db)):
     from sqlalchemy import text as sqlt
     try:
         count=db.execute(sqlt(f"SELECT COUNT(*) FROM ad_views WHERE ad_id={ad_id}")).fetchone()[0]
-        return{{"count":count}}
+        return{"count":count}
     except:
-        return{{"count":0}}
+        return{"count":0}
 
 
 
