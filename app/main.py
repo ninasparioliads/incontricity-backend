@@ -734,17 +734,25 @@ def book_slot(slot_id:int,body:dict,user=Depends(cur_user),db:Session=Depends(ge
 @app.post("/admin/fake-views")
 def fake_views(user=Depends(cur_user),db:Session=Depends(get_db)):
     from sqlalchemy import text as sqlt
-    import datetime
+    import datetime,random
     if not user or not user.is_admin: raise HTTPException(403)
-    # Get ads from users registered at least 3 days ago
-    cutoff=(datetime.datetime.now()-datetime.timedelta(days=3)).isoformat()
-    ads=db.execute(sqlt(f"SELECT a.id FROM ads a JOIN users u ON a.user_id=u.id WHERE u.created_at IS NULL OR u.id IN (SELECT id FROM users WHERE created_at<'{cutoff}') AND a.paid=true")).fetchall()
-    updated=0
-    for (ad_id,) in ads:
+    # Get paid ads from real users registered at least 3 days ago
+    cutoff=(datetime.datetime.now()-datetime.timedelta(days=3)).strftime("%Y-%m-%d")
+    ads=db.execute(sqlt(f"""
+        SELECT a.id FROM ads a 
+        JOIN users u ON a.user_id=u.id 
+        WHERE a.paid=true 
+        AND a.user_id IS NOT NULL
+        AND (u.created_at IS NULL OR u.created_at::date <= '{cutoff}')
+    """)).fetchall()
+    if not ads: return{"updated":0}
+    # Pick random subset (up to 30% of ads, min 1)
+    count=max(1,len(ads)//3)
+    selected=random.sample(ads,min(count,len(ads)))
+    for (ad_id,) in selected:
         db.execute(sqlt(f"UPDATE ads SET views=COALESCE(views,0)+1 WHERE id={ad_id}"))
-        updated+=1
     db.commit()
-    return{"updated":updated}
+    return{"updated":len(selected)}
 
 # ── ADMIN ─────────────────────────────────────────────────────
 
