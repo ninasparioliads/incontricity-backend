@@ -352,17 +352,6 @@ def get_duration_prices():
         "vip":[100,500,800,2000,4000,8000]
     }}
 
-@app.put("/duration-prices/{plan_type}")
-def update_duration_prices(plan_type:str,prices:list,user=Depends(cur_user),db:Session=Depends(get_db)):
-    if not user or not user.is_admin: raise HTTPException(403)
-    from sqlalchemy import text as sqlt
-    for i,price in enumerate(prices):
-        days=[3,7,30,90,180,365][i]
-        db.execute(sqlt(f"INSERT INTO duration_prices (plan_type,days,label,price) VALUES ('{plan_type}',{days},'{days}d',{price}) ON CONFLICT (plan_type,days) DO UPDATE SET price={price}"))
-    db.commit()
-    return{"ok":True}
-
-
 @app.get("/duration-prices/config")
 def get_dur_config(db:Session=Depends(get_db)):
     from sqlalchemy import text as sqlt
@@ -383,6 +372,18 @@ def set_dur_config(data:dict=Body(...),user=Depends(cur_user),db:Session=Depends
     db.execute(sqlt("CREATE TABLE IF NOT EXISTS config (key VARCHAR(50) PRIMARY KEY, value TEXT)"))
     for k,v in data.items():
         db.execute(sqlt(f"INSERT INTO config (key,value) VALUES ('{k}','{json.dumps(v)}') ON CONFLICT (key) DO UPDATE SET value='{json.dumps(v)}'"))
+    db.commit()
+    return{"ok":True}
+
+
+
+@app.put("/duration-prices/{plan_type}")
+def update_duration_prices(plan_type:str,prices:list,user=Depends(cur_user),db:Session=Depends(get_db)):
+    if not user or not user.is_admin: raise HTTPException(403)
+    from sqlalchemy import text as sqlt
+    for i,price in enumerate(prices):
+        days=[3,7,30,90,180,365][i]
+        db.execute(sqlt(f"INSERT INTO duration_prices (plan_type,days,label,price) VALUES ('{plan_type}',{days},'{days}d',{price}) ON CONFLICT (plan_type,days) DO UPDATE SET price={price}"))
     db.commit()
     return{"ok":True}
 
