@@ -736,14 +736,11 @@ def fake_views(user=Depends(cur_user),db:Session=Depends(get_db)):
     from sqlalchemy import text as sqlt
     import datetime,random
     if not user or not user.is_admin: raise HTTPException(403)
-    # Get paid ads from real users registered at least 3 days ago
-    cutoff=(datetime.datetime.now()-datetime.timedelta(days=3)).strftime("%Y-%m-%d")
-    ads=db.execute(sqlt(f"""
+    # Get paid ads from real users
+    ads=db.execute(sqlt("""
         SELECT a.id FROM ads a 
-        JOIN users u ON a.user_id=u.id 
         WHERE a.paid=true 
         AND a.user_id IS NOT NULL
-        AND (u.created_at IS NULL OR u.created_at::date <= '{cutoff}')
     """)).fetchall()
     if not ads: return{"updated":0}
     # Pick random subset (up to 30% of ads, min 1)
