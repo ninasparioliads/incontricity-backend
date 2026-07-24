@@ -760,6 +760,19 @@ def free_slot_by_ad(ad_id:int,user=Depends(cur_user),db:Session=Depends(get_db))
     db.commit()
     return{"ok":True}
 
+
+@app.get("/grid-slots/remaining-days/{ad_id}")
+def get_remaining_days(ad_id:int,user=Depends(cur_user),db:Session=Depends(get_db)):
+    from sqlalchemy import text as sqlt
+    import datetime
+    if not user: raise HTTPException(401)
+    row=db.execute(sqlt(f"SELECT end_date FROM grid_slots WHERE ad_id={ad_id} AND is_occupied=true")).fetchone()
+    if not row or not row[0]: return{"days":0,"end_date":None}
+    today=datetime.date.today()
+    end=row[0] if isinstance(row[0],datetime.date) else datetime.date.fromisoformat(str(row[0]))
+    days=max(0,(end-today).days)
+    return{"days":days,"end_date":str(end)}
+
 # ── ADMIN ─────────────────────────────────────────────────────
 
 @app.get("/admin/pending")
