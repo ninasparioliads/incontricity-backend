@@ -51,6 +51,7 @@ class AdOut(BaseModel):
     views:Optional[int]=0
     slot_start:Optional[str]=None
     slot_end:Optional[str]=None
+    expires_at:Optional[str]=None
     services_included:Optional[str]=None; services_extra:Optional[str]=None
     height:Optional[str]=None; weight:Optional[str]=None
     ethnicity:Optional[str]=None; orientation:Optional[str]=None
