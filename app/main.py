@@ -799,6 +799,24 @@ def get_remaining_days(ad_id:int,user=Depends(cur_user),db:Session=Depends(get_d
         total_days=days
     return{"days":days,"total_days":total_days,"end_date":str(end)}
 
+
+@app.get("/ads/{ad_id}/distance")
+def get_distance(ad_id:int,user_lat:float,user_lng:float,db:Session=Depends(get_db)):
+    from sqlalchemy import text as sqlt
+    import math
+    row=db.execute(sqlt(f"SELECT lat,lng FROM ads WHERE id={ad_id}")).fetchone()
+    if not row or not row[0] or not row[1]: return{"distance":None,"label":None}
+    lat1,lng1,lat2,lng2=math.radians(user_lat),math.radians(user_lng),math.radians(row[0]),math.radians(row[1])
+    dlat=lat2-lat1;dlng=lng2-lng1
+    a=math.sin(dlat/2)**2+math.cos(lat1)*math.cos(lat2)*math.sin(dlng/2)**2
+    km=6371*2*math.asin(math.sqrt(a))
+    if km<2: label="Nearby"
+    elif km<5: label="10 min"
+    elif km<15: label="30 min"
+    elif km<30: label="1 hour"
+    else: label="Far"
+    return{"distance":round(km,1),"label":label}
+
 # ── ADMIN ─────────────────────────────────────────────────────
 
 @app.get("/admin/pending")
