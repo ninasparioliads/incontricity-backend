@@ -27,7 +27,7 @@ except:
 async def lifespan(app):
     # Base.metadata.create_all(bind=engine)  # disabled to preserve manual schema changes
     db=next(get_db())
-    if db.query(Ad).count()==0: seed(db)
+    # if db.query(Ad).count()==0: seed(db)
     db.close()
     yield
 
@@ -750,6 +750,15 @@ def fake_views(user=Depends(cur_user),db:Session=Depends(get_db)):
         db.execute(sqlt(f"UPDATE ads SET views=COALESCE(views,0)+1 WHERE id={ad_id}"))
     db.commit()
     return{"updated":len(selected)}
+
+
+@app.post("/grid-slots/free-by-ad/{ad_id}")
+def free_slot_by_ad(ad_id:int,user=Depends(cur_user),db:Session=Depends(get_db)):
+    from sqlalchemy import text as sqlt
+    if not user: raise HTTPException(401)
+    db.execute(sqlt(f"UPDATE grid_slots SET is_occupied=false,ad_id=NULL,start_date=NULL,end_date=NULL WHERE ad_id={ad_id}"))
+    db.commit()
+    return{"ok":True}
 
 # ── ADMIN ─────────────────────────────────────────────────────
 
