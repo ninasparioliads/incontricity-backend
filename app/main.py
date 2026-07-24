@@ -49,6 +49,8 @@ class AdOut(BaseModel):
     photos:Optional[str]=None; video:Optional[str]=None
     user_id:Optional[int]=None
     views:Optional[int]=0
+    slot_start:Optional[str]=None
+    slot_end:Optional[str]=None
     services_included:Optional[str]=None; services_extra:Optional[str]=None
     height:Optional[str]=None; weight:Optional[str]=None
     ethnicity:Optional[str]=None; orientation:Optional[str]=None
@@ -170,9 +172,15 @@ def list_ads(cat:Optional[str]=None,country:Optional[str]=None,lang:Optional[str
 
 @app.get("/ads/{ad_id}",response_model=AdOut)
 def get_ad(ad_id:int,db:Session=Depends(get_db)):
+    from sqlalchemy import text as sqlt
     ad=db.query(Ad).filter(Ad.id==ad_id).first()
     if not ad: raise HTTPException(404)
-    return ad
+    slot=db.execute(sqlt(f"SELECT start_date,end_date FROM grid_slots WHERE ad_id={ad_id} AND is_occupied=true")).fetchone()
+    result=AdOut.model_validate(ad)
+    if slot:
+        result.slot_start=str(slot[0]) if slot[0] else None
+        result.slot_end=str(slot[1]) if slot[1] else None
+    return result
 
 @app.post("/ads",response_model=AdOut,status_code=201)
 def create_ad(body:AdCreate,user=Depends(cur_user),db:Session=Depends(get_db)):
