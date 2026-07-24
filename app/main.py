@@ -735,6 +735,9 @@ def book_slot(slot_id:int,body:dict,user=Depends(cur_user),db:Session=Depends(ge
     ad_id=body.get("ad_id")
     db.execute(sqlt("UPDATE grid_slots SET is_occupied=true,ad_id=:a,start_date=:s,end_date=:e WHERE id=:id"),
                {"a":ad_id,"s":start,"e":end,"id":slot_id})
+    # Save expires_at in ad
+    if ad_id and end:
+        db.execute(sqlt(f"UPDATE ads SET expires_at='{end}' WHERE id={ad_id}"))
     db.commit()
     return{"ok":True}
 
@@ -774,10 +777,16 @@ def get_remaining_days(ad_id:int,user=Depends(cur_user),db:Session=Depends(get_d
     from sqlalchemy import text as sqlt
     import datetime
     if not user: raise HTTPException(401)
+    # Try slot first, then expires_at in ad
     row=db.execute(sqlt(f"SELECT end_date FROM grid_slots WHERE ad_id={ad_id} AND is_occupied=true")).fetchone()
-    if not row or not row[0]: return{"days":0,"end_date":None}
+    if not row or not row[0]:
+        # Fallback to expires_at in ad
+        row2=db.execute(sqlt(f"SELECT expires_at FROM ads WHERE id={ad_id}")).fetchone()
+        if not row2 or not row2[0]: return{"days":0,"end_date":None}
+        end=datetime.date.fromisoformat(str(row2[0])[:10])
+    else:
+        end=row[0] if isinstance(row[0],datetime.date) else datetime.date.fromisoformat(str(row[0]))
     today=datetime.date.today()
-    end=row[0] if isinstance(row[0],datetime.date) else datetime.date.fromisoformat(str(row[0]))
     days=max(0,(end-today).days)
     return{"days":days,"end_date":str(end)}
 
