@@ -788,7 +788,15 @@ def get_remaining_days(ad_id:int,user=Depends(cur_user),db:Session=Depends(get_d
         end=row[0] if isinstance(row[0],datetime.date) else datetime.date.fromisoformat(str(row[0]))
     today=datetime.date.today()
     days=max(0,(end-today).days)
-    return{"days":days,"end_date":str(end)}
+    # Also get start_date to calculate total purchased days
+    row_full=db.execute(sqlt(f"SELECT start_date,end_date FROM grid_slots WHERE ad_id={ad_id} AND is_occupied=true")).fetchone()
+    if row_full and row_full[0] and row_full[1]:
+        s=row_full[0] if isinstance(row_full[0],datetime.date) else datetime.date.fromisoformat(str(row_full[0]))
+        e=row_full[1] if isinstance(row_full[1],datetime.date) else datetime.date.fromisoformat(str(row_full[1]))
+        total_days=(e-s).days+1
+    else:
+        total_days=days
+    return{"days":days,"total_days":total_days,"end_date":str(end)}
 
 # ── ADMIN ─────────────────────────────────────────────────────
 
